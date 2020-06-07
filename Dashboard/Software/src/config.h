@@ -50,35 +50,40 @@
 
 /**
  * LED-Band Configuration
- * different Color values
  */
 #define NEOPIXEL_NUMBER_OF_LEDS 14
 #define NEOPIXEL_REFRESH_RATE 30 //in milliseconds
-#define NEOPIXEL_BRIGHTNESS 5 //[0 - 255]; the normal ligth level if the Led Band
+#define NEOPIXEL_BRIGHTNESS 20 //[0 - 255]; the normal ligth level if the Led Band
 
-#define NEOPIXEL_RPM_LOW 20 //x100
+#define NEOPIXEL_RPM_LOW 20 //x100; 
 #define NEOPIXEL_RPM_MIDDLE 40 //x100
 #define NEOPIXEL_RPM_HIGH 60 //x100
 #define NEOPIXEL_RPM_MAX 130 //x100
+
+#define NEOPIXEL_RPM_LOW_COLOR 0 //0=Blue; 1=Green; 2=Yellow, 3=Red
+#define NEOPIXEL_RPM_MIDDLE_COLOR 1 //0=Blue; 1=Green; 2=Yellow, 3=Red
+#define NEOPIXEL_RPM_HIGH_COLOR 2 //0=Blue; 1=Green; 2=Yellow, 3=Red
+#define NEOPIXEL_RPM_MAX_COLOR 3 //0=Blue; 1=Green; 2=Yellow, 3=Red
+
 #define NEOPIXEL_RPM_MIN_LED 3 //the RPM View should not be empty; this Value stands for the LEDs, which show the current RPM Mode
 
-#define NEOPIXEL_SHIFTLIGHT_BRIGHTNESS 50 // [NEOPIXEL_BRIGHTNESS-255]; the light Level for a short flash
-#define NEOPIXEL_SHIFTLIGHT_DELAY 200 //time in milliseconds for the duration of the ShiftLight; the min time is the delay time of the current Display Mode
+#define NEOPIXEL_SHIFTLIGHT_BRIGHTNESS 255 // [NEOPIXEL_BRIGHTNESS-255]; the light Level for a short flash
+#define NEOPIXEL_SHIFTLIGHT_COLOR 0 //0 = red; 1 = white; 2 = green; 3 = yellow
+#define NEOPIXEL_SHIFTLIGHT_DELAY 300 //time in milliseconds for the duration of the ShiftLight; the min time is the delay time of the current Display Mode
 
-#define NEOPIXEL_SHIFTLIGHT_CAN 1 //turn on CAN Shift Light Indicator with 1; turn off with 0
-#if NEOPIXEL_SHIFTLIGHT_CAN==0
-    #define NEOPIXEL_SHIFTLIGHT_BUTTON_TEST 1 //trigger ShiftLight through the button; simulate a CAN-LightShift signal; NEOPIXEL_SHIFTLIGHT_CAN mmust be set "On"
+#define NEOPIXEL_SHIFTLIGHT_CAN 0 //turn on CAN Shift Light Indicator with 1; 0 turn off CAN Trigger and activate onboard ShiftLight
+#if NEOPIXEL_SHIFTLIGHT_CAN==1
+    #define NEOPIXEL_SHIFTLIGHT_BUTTON_TEST 0 //trigger ShiftLight through the button; simulate a CAN-LightShift signal; NEOPIXEL_SHIFTLIGHT_CAN mmust be set "On"
 #endif
 
-
-#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_1 30  //x100
-#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_2 50  //x100
-#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_3 80  //x100
-#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_4 100 //x100
-#define NEOPIXEL_SHIFTLIGHT_RANGE 3 //x100
+#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_1 30  //x100; all gear changes are make on the same RPM Range
+#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_2 50  //x100; NOT USED...
+#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_3 80  //x100; NOT USED...
+#define NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_4 100 //x100; NOT USED...;
+#define NEOPIXEL_SHIFTLIGHT_RANGE 4 //x100; range value for each direction
 
 #define NEOPIXEL_RPM_DIRECTION 1 //0=right to left; 1=left to right; 2=zickzack
-#define NEOPIXEL_RPM_LOW_BRIGHTNESS 8 //NOT USED!!!; [0-NEOPIXEL_BRIGHTNESS]; the light Level for the old RPM Color
+#define NEOPIXEL_RPM_LOW_BRIGHTNESS 8 //NOT USED...; [0-NEOPIXEL_BRIGHTNESS]; the light Level for the old RPM Color
 
 
 
@@ -89,7 +94,7 @@
 #define DEMO_BUTTON_NUMBER 3 //the number of short pushes to activate the Demo Mode
 #define DEMO_BUTTON_MAX_DELAY 500 //the max time to push the button each to activate the Demo Mode; must be higher than the BUTTON_BOUNCE_TIME 
 
-#define DEMO_RPM_BY_POTENTIOMETER 0 //use a potentiometer for the RPM Values; 1= On; 0 = Off
+#define DEMO_RPM_BY_POTENTIOMETER 1 //use a potentiometer for the RPM Values; 1= On; 0 = Off
 #define DEMO_RPM_POTENTIOMETER_MIN 0 //min RPM Value by the Poti
 #define DEMO_RPM_POTENTIOMETER_MAX 130 //max RPM Value by the Poti
 

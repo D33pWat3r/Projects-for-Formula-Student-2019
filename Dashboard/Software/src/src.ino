@@ -21,9 +21,8 @@ void loop() {
   if(CanData.flagCanRecv && !demo.isDemoMode_Button) readCAN(); 
   
   //Check for ShiftLight
-
   #if NEOPIXEL_SHIFTLIGHT_CAN == 0
-    if(checkRpmForShiftLight) makeShiftLight();
+    if(checkRpmForShiftLight()) makeShiftLight();
   #else
     if(shift) makeShiftLight();
   #endif
@@ -43,10 +42,7 @@ void loop() {
   if((millis() - demo.lastDemoCalc > DEMO_CALC_SPEED) && (demo.isDemoMode || demo.isDemoMode_Button) ) {
     demoCalcSpeed();
   }
-
-
 }
-
 
 void readCAN() {
   CanData.flagCanRecv = false;
@@ -77,7 +73,7 @@ void readCAN() {
     if(CanData.canId == CAN_ID_CANOUT){
       uint16_t temp;
       get_CAN_CanOut(&CanData, &temp);
-      shift = uint8_t (temp & 0x01);
+      shift = (uint8_t) (temp & 0x01);
     }
       printData(); // Debug only
   }    

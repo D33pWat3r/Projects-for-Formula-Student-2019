@@ -269,12 +269,13 @@ uint32_t getColor(uint8_t r, uint8_t g, uint8_t b, BrighnessLevel levelOfBrightn
 }    
 
 const uint32_t normalWhite = getColor(255,255,255); // white
-
 const uint32_t normalRed = getColor(255, 0, 0); // Red
 const uint32_t normalGreen = getColor(0, 255, 0); // Green
 const uint32_t normalYellow = getColor(255, 255, 0); // Yellow
 const uint32_t normalBlue = getColor( 0, 0, 255); // Blue
-const uint32_t normalOrange = getColor( 255, 80, 0); // orange
+const uint32_t normalOrange = getColor( 255, 120, 0); // orange
+const uint32_t* normalColor[] = {&normalBlue, &normalGreen, &normalYellow, &normalRed};
+
 
 const uint32_t lowRed = getColor(255, 0, 0,low); // Red
 const uint32_t lowGreen = getColor(0, 255, 0,low); // Green
@@ -283,11 +284,15 @@ const uint32_t lowBlue = getColor( 0, 0, 255,low); // Blue
 
 const uint32_t shiftLightWhite = getColor(255, 255, 255,high); // white
 const uint32_t shiftLightRed = getColor(255, 0, 0,high); // Red
+const uint32_t shiftLightGreen = getColor(0, 255, 0,high); // white
+const uint32_t shiftLightYellow = getColor(255, 255, 0,high); // Red
+const uint32_t* shiftLightColor[] = {&shiftLightRed, &shiftLightWhite, &shiftLightGreen, &shiftLightYellow};
 
 void initNeopixel(void){
   neoPixels.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  neoPixels.setBrightness(255); // Set BRIGHTNESS
+  neoPixels.setBrightness(0xff); // Set BRIGHTNESS
   neoPixels.fill(normalOrange);
+  delay(100);
   neoPixels.show(); 
   lastNeoFlash = millis();
 }
@@ -309,31 +314,31 @@ void updateSpeedBar() {
   if((millis() - shiftLightActiveTime) > NEOPIXEL_SHIFTLIGHT_DELAY) shiftLightIsActive = false;
   if((displayMode > 0) && (!shiftLightIsActive)){
     
-    uint32_t rpmColor;
+    uint8_t rpmColor;
     if(rpm<=NEOPIXEL_RPM_LOW){
       speedLeds = map(rpm,0,NEOPIXEL_RPM_LOW,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);      
-      rpmColor = normalBlue;
+      rpmColor = NEOPIXEL_RPM_LOW_COLOR;
       #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = true; 
       #endif
     }
     if((rpm>NEOPIXEL_RPM_LOW) && (rpm<=NEOPIXEL_RPM_MIDDLE)){
       speedLeds = map(rpm,NEOPIXEL_RPM_LOW,NEOPIXEL_RPM_MIDDLE,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
-      rpmColor = normalGreen;
+      rpmColor = NEOPIXEL_RPM_MIDDLE_COLOR;
       #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = false; 
       #endif
     }
     if((rpm>NEOPIXEL_RPM_MIDDLE) && (rpm<=NEOPIXEL_RPM_HIGH)){
       speedLeds = map(rpm,NEOPIXEL_RPM_MIDDLE,NEOPIXEL_RPM_HIGH,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
-      rpmColor = normalYellow;
+      rpmColor = NEOPIXEL_RPM_HIGH_COLOR;
       #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = true; 
       #endif
     }    
     if((rpm>NEOPIXEL_RPM_HIGH) && (rpm<=NEOPIXEL_RPM_MAX)){
       speedLeds = map(rpm,NEOPIXEL_RPM_HIGH,NEOPIXEL_RPM_MAX,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
-      rpmColor = normalRed;
+      rpmColor = NEOPIXEL_RPM_MAX_COLOR;
       #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = false; 
       #endif
@@ -342,12 +347,12 @@ void updateSpeedBar() {
     neoPixels.clear();
 
     for(uint8_t a=0; a < NEOPIXEL_RPM_MIN_LED; a++) {
-        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, rpmColor);
-          else neoPixels.setPixelColor(a, rpmColor);
+        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, *(normalColor[rpmColor]));
+          else neoPixels.setPixelColor(a, *(normalColor[rpmColor]));
     }
     for(uint8_t a=0; a < speedLeds; a++) {
-        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a-NEOPIXEL_RPM_MIN_LED, rpmColor);
-          else neoPixels.setPixelColor(a+NEOPIXEL_RPM_MIN_LED, rpmColor);
+        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a-NEOPIXEL_RPM_MIN_LED, *(normalColor[rpmColor]));
+          else neoPixels.setPixelColor(a+NEOPIXEL_RPM_MIN_LED, *(normalColor[rpmColor]));
     }
     neoPixels.show();
     lastNeoFlash = millis();
@@ -356,9 +361,16 @@ void updateSpeedBar() {
 }
 
 // Neopixel - ShiftLight ******************************************************************************************
+bool isInRpmRange = false;
 bool checkRpmForShiftLight(void){
-  if(rpm != rpm_old){
-    shift = false;
+  if(((NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_1-NEOPIXEL_SHIFTLIGHT_RANGE)<rpm) &&
+   (rpm <(NEOPIXEL_SHIFTLIGHT_CHANGE_GEAR_1+NEOPIXEL_SHIFTLIGHT_RANGE))){
+      if(!isInRpmRange){
+        isInRpmRange = true;
+        return true;
+      } 
+  }else{
+    isInRpmRange = false;
   }
   return false;
 }
@@ -366,7 +378,7 @@ bool checkRpmForShiftLight(void){
 void makeShiftLight(void){
   if(!shiftLightIsActive){
     shiftLightIsActive =true;
-    neoPixels.fill(shiftLightRed);
+    neoPixels.fill(*(shiftLightColor[NEOPIXEL_SHIFTLIGHT_COLOR]));
     neoPixels.show();
     shiftLightActiveTime = millis();
     shift = false;
