@@ -11,6 +11,7 @@
 #define CAN_ID_THROTTLE 1003
 #define CAN_ID_GEAR 1033
 #define CAN_ID_FUEL_DATA 1052
+#define CAN_ID_CANOUT 0000
 
 struct tCAN_Data{
     bool flagCanRecv = false;
@@ -30,7 +31,7 @@ void get_CAN_TPS(tCAN_Data* CAN_data, float* returnValue); //Throttle position
 void get_CAN_Gear(tCAN_Data* CAN_data, uint8_t* returnValue); //Current gear selected
 void get_CAN_FuelCons(tCAN_Data* CAN_data, uint16_t* returnValue); //Average fuel consumption
 void get_CAN_FuelFlow(tCAN_Data* CAN_data, uint16_t* returnValue); //Average fuel flow
-
+void get_CAN_CanOut(tCAN_Data* CAN_data, uint16_t* returnValue); //Return CanOut1 & CanOut2; Byte-Structure: HighByte->[CanOut2 | CanOut1]<-LowByte
 
 
 

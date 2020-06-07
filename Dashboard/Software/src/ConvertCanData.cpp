@@ -55,3 +55,7 @@ void get_CAN_FuelFlow(tCAN_Data* CAN_data, uint16_t* returnValue){
     *returnValue = ((*CAN_data).canBuf[4]<<8) + (*CAN_data).canBuf[5];
     return;
 }
+void get_CAN_CanOut(tCAN_Data* CAN_data, uint16_t* returnValue){
+    *returnValue = ((*CAN_data).canBuf[4]<<8) + (*CAN_data).canBuf[5]; //the right Bytes!!!!!!????
+    return;
+} 

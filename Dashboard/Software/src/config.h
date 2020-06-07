@@ -16,22 +16,35 @@
 
 // Neopixel LED Band
 #define NEOPIXEL_PIN 4
-#define NEOPIXEL_NUMBER_OF_LEDS 14
 
 //Input Configuration
 #define BUTTON_PIN 3 //is an Interrupt Pin too
-#define BUTTON_BOUNCE_TIME 40 //a Button bounce between HIGH and LOW for a specific time; this is the max. bounce time in milliseconds
+#define BUTTON_BOUNCE_TIME 200 //a Button bounce between HIGH and LOW for a specific time; this is the max. bounce time in milliseconds
+
+//Output Configuration
+#define LED_PIN_1 5
+#define LED_PIN_2 6
+#define LED_PIN_3 9
+
+//***********************************************************************************************
 
 /**
- * Display & LED Configuration
+ * Display Configuration
  */
 #define DISPLAY_REFRESH_RATE 500 //in milliseconds
 #define DISPLAY_BRIGHTNESS  7 //1 - 7
 #define DISPLAY_NUMBER_OF_SCREENS 2 //Number of Display screens with different Values
 #define DISPLAY_DELAY_BY_SCREEN_CHANGE 1000 //time in milliseconds for show the current Display Screen Number
+#define DISPLAY_NUMBER_OF_STATES 3 // delay time in milliseconds for show the different values
+#define DISPLAY_DELAY_MULTIPLIER 1 // the refresh Rate of the State-Mode based of the (DISPLAY_REFRESH_RATE * DISPLAY_DELAY_MULTIPLIER)
 
+/**
+ * LED Configuration
+ */
+#define NEOPIXEL_NUMBER_OF_LEDS 14
 #define NEOPIXEL_REFRESH_RATE 20 //in milliseconds
-#define NEOPIXEL_BRIGHTNESS 50 //0 - 255
+#define NEOPIXEL_BRIGHTNESS 20 //0 - 255
+#define NEOPIXEL_CAN_SHIFTLIGHT 0 //turn on CAN Shift Light Indicator with 1; turn off with 0
 
 /**
  * Demo Configuration

@@ -8,13 +8,15 @@ void setup() {
   initDebugging(115200); //Starte Seriellen Port für debugging Ausgaben
   initDisplay(); //Start Display
   initNeopixel(); //Start NeoPixel
-  initCAN(); // Start CAN-BUS
+  //initCAN(); // Start CAN-BUS
   initInput(); //Set Button to Input
+  delay(2000);
+  display.setSegments(display_blank, 4, 0);
 }
 
 void loop() {
   //Read CAN if new incoming Datas
-  if(CanData.flagCanRecv) readCAN(); 
+  if(CanData.flagCanRecv && !demo.isDemoMode_Button) readCAN(); 
   
   //Refreshing Display
   if(millis() - lastDisplayFlash > DISPLAY_REFRESH_RATE) {
@@ -24,8 +26,7 @@ void loop() {
 
   //Refreshing LED Band
   if(millis() - lastNeoFlash > NEOPIXEL_REFRESH_RATE) {
-    int dec = rpm/(UMD_MAX_ENGINE_SPEED/100);
-    updateSpeedBar(dec);
+    updateSpeedBar();
   }
 
   //Refreshing and Recalc Demovalues
@@ -61,7 +62,11 @@ void readCAN() {
       get_CAN_FuelCons(&CanData, &fuelcons);
       get_CAN_FuelFlow(&CanData, &fuelflow);
       };
-
+    if(CanData.canId == CAN_ID_CANOUT){
+      uint16_t temp;
+      get_CAN_CanOut(&CanData, &temp);
+      shift = uint8_t (temp & 0x01);
+    }
       printData(); // Debug only
   }    
 }

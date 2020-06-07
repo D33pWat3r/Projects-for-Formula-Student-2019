@@ -14,12 +14,15 @@ float clt; //Coolant temperature CAN in degF saved in degC
 float mat; //Manifold air temperature CAN in degF saved in degC
 float map1; //Manifold air pressure;
 float baro; //Barometric pressure;
-float batt; //Battery voltage;
+float batt = 12.6f; //Battery voltage;
 float tps; //Throttle position;
 uint8_t gear; //Current gear selected
 uint16_t fuelcons; //Average fuel consumption;
 uint16_t fuelflow; //Average fuel flow;
+bool shift; //Shift light indicator;
 
+// Declerations ******************************************************************************************
+void updateProgress(uint8_t _state, uint8_t colorValue);
 
 // Debugging ******************************************************************************************
 void initDebugging(uint32_t baud){
@@ -48,6 +51,13 @@ struct tDemo{
   bool isDemoMode_Button :1;
   uint32_t lastDemoCalc;
 } demo = {0,100,true,true,false,0};
+
+void resetDemoValue(){
+  rpm =0;
+  clt =0.0f;
+  batt = 0.0f;
+  gear = 0;
+}
 
 void demoCalcSpeed() {
   if(demo.demoUp) {
@@ -79,28 +89,17 @@ void demoCalcSpeed() {
 }
 
 // Input Mode ******************************************************************************************
-volatile uint8_t pushButtonCount = 0;
-volatile bool pushButtonIsSet = false;
-uint8_t shortPushCount = 0; //Counter for short Pushes to activate the Demo Mode
+volatile uint8_t displayMode = 0;
+volatile bool pushButtonIsSet = true;
 
 void ISR_Button(){
   static uint32_t lastPushTime = 0;
   uint32_t currentPushTime = millis();
-
-  if(currentPushTime - lastPushTime > BUTTON_BOUNCE_TIME){
+  
+  if(currentPushTime - lastPushTime >= BUTTON_BOUNCE_TIME){
     pushButtonIsSet = true;
-
-    //check for short Pushes to activate the Demo Mode
-    if(currentPushTime - lastPushTime < DEMO_BUTTON_MAX_DELAY){
-      shortPushCount++;
-      if(shortPushCount >= DEMO_BUTTON_NUMBER) demo.isDemoMode_Button=true;
-      return; //a short Push does not change the Display
-    }
-
-    //is not a short Push
-    shortPushCount=0;
+    displayMode = (displayMode +1) % (DISPLAY_NUMBER_OF_SCREENS+1);
     demo.isDemoMode_Button = false;
-    pushButtonCount = (pushButtonCount +1) % DISPLAY_NUMBER_OF_SCREENS;
   }
   lastPushTime = currentPushTime;
 }
@@ -117,58 +116,108 @@ void initInput(void){
 TM1637Display display(DISPLAY_CLK, DISPLAY_DIO);
 uint32_t lastDisplayFlash;
 bool displayShow;
-const uint8_t displayBlank[] = { 0x00, 0x00, 0x00, 0x00 };
-const uint8_t umd[] = { 0b00111110, 0b00110011, 0b00100111, 0b00111111 };
-const uint8_t screen[DISPLAY_NUMBER_OF_SCREENS + 1][4] ={
+const uint8_t display_blank[] = { 0x00, 0x00, 0x00, 0x00 };
+const uint8_t display_umd[] =  { 0b00111110, 0b00110011, 0b00100111, 0b00111111 }; //UMD
+const uint8_t display_fs19[] = { 0b01110001, 0b01101101, 0b00000110, 0b01101111 }; //FS19
+
+const uint8_t screen[][4] ={
+  { 0b01101101, 0b01111000, 0b01011100, 0b01111000 }, // Stat; must be on the first position!
   { 0b10000110, 0b01111001, 0b01010100, 0b01011110 }, // 1.End
   { 0b11011011, 0b01110111, 0b01011000, 0b01011000 }, // 2.Acc 
-//{ 0b11100111, 0b01111111, 0b01111111, 0b01111111 }, // 3.888     
+//{ 0b11001111, 0b01111111, 0b01111111, 0b01111111 }, // 3.888     
   { 0b01011110, 0b01111001, 0b01010101, 0b00111111 }  // dEMO; must be the last entry in this array!       
+};
+
+const uint8_t state[][4] ={
+  { 0b01111100, 0b01011100, 0b01111000, 0b01111000 }, //batt -> Batterie Voltage
+  { 0b00111101, 0b01111001, 0b01011100, 0b01010000 }, //GEar -> current Gear
+  //{ 0b00111001, 0b00110000, 0b01111000, 0b00000000 }, //Clt -> Engine Temperature
+  { 0b01111000, 0b01111001, 0b01010101, 0b01110011 }, //tEMP -> Engine Temperature      
 };
 
 void initDisplay(void){
     display.setBrightness(DISPLAY_BRIGHTNESS);
-    display.setSegments(umd);
+    display.setSegments(display_fs19);
     lastDisplayFlash = millis();
 }
 
+static uint8_t stateCount = 0;
+static uint8_t lastTimeCount = 0;
+static bool showState = true;
 void refreshDisplay(){
   if(!pushButtonIsSet){
-    switch(pushButtonCount){ // the max. number of screens must be set in the "config.h"
-      case(0): //Gear and Temperature -> endurance
-        display.setSegments(displayBlank, 1, 1);
-        display.showNumberDec(clt, true, 3, 1);
+    switch(displayMode){ // the max. number of screens must be set in the "config.h"
+      case(0): //different States
+        if(lastTimeCount == 1) updateProgress(stateCount, (uint8_t) showState);
+        switch (stateCount){
+        case (0)://Batterie Voltage
+          if (showState) display.setSegments(state[stateCount]);
+          else{
+            display.showNumberDecEx((int) (batt*10), 0b01000000, false, 3, 1);
+            display.setSegments(display_blank,1,0);
+          }
+          break;
+        case (1)://current Gear
+          if (showState) display.setSegments(state[stateCount]);
+          else{
+            display.showNumberDec(gear, false, 1, 3);           
+            display.setSegments(display_blank,3,0);
+          }
+          break;
+        case (2)://Engine Temperature
+          if (showState) display.setSegments(state[stateCount]);
+          else{
+            display.setSegments(display_blank,1,0);
+            display.showNumberDecEx((int) (clt*10), 0b00100000, false, 4, 0);            
+          }          
+          break;
+        }
+        if(lastTimeCount == DISPLAY_DELAY_MULTIPLIER){
+          lastTimeCount = 0;
+          if(!showState) {stateCount=(stateCount+1)%DISPLAY_NUMBER_OF_STATES;}
+          showState=!showState;
+        }
+        lastTimeCount++;
+        
+        break;    
+      case(1): //Gear and Temperature -> endurance
+        //display.setSegments(displayBlank, 1, 1);
         display.showNumberDecEx(gear, 0x80, false, 1, 0); //x.yyy -> x= Gear; y=Temperature
+        display.showNumberDec(clt, false, 3, 1);        
         break;
-      case(1): //Gear and RPM -> acceleration
-        display.setSegments(displayBlank, 1, 1);
-        display.showNumberDec((int) (rpm/100), true, 3, 1);
+      case(2): //Gear and RPM -> acceleration
+        //display.setSegments(displayBlank, 1, 1);        
         display.showNumberDecEx(gear, 0x80, false, 1, 0); //x.yyy -> x= Gear; y=RPM
+        display.showNumberDec((int) (rpm/100), false, 3, 1);
         break;
     }
   } else {
-      static uint8_t localDelay = 0;
+    static uint8_t localDelay = 0;
       if(localDelay == 0){
-        if(demo.isDemoMode_Button) display.setSegments(screen[DISPLAY_NUMBER_OF_SCREENS], 1, 1);
-          else display.setSegments(screen[pushButtonCount], 1, 1);
-        localDelay = (uint8_t) DISPLAY_DELAY_BY_SCREEN_CHANGE / DISPLAY_REFRESH_RATE;
-      }
-      if(localDelay == 1) pushButtonIsSet = false;
+        localDelay = (uint8_t) (DISPLAY_DELAY_BY_SCREEN_CHANGE / DISPLAY_REFRESH_RATE);
+        if(!demo.isDemoMode_Button) display.setSegments(screen[displayMode], 4, 0);
+          else display.setSegments(screen[DISPLAY_NUMBER_OF_SCREENS], 4, 0);
+      }     
+      if(localDelay == 1) pushButtonIsSet = false; 
       localDelay--;
+      //display.setSegments(displayBlank);
   }
 }
 
 
 // CAN ******************************************************************************************
-#include "mcp_can.h" //CAN Library by Seed-Studio
+#include "mcp_can.h" //CAN Library by Seeed-Studio
 #include "ConvertCanData.h"
 
 MCP_CAN CAN(CAN_SPI_CS_PIN);
 tCAN_Data CanData; //CAN "Stack"
 
 void MCP2515_ISR() {
-    CanData.flagCanRecv = 1;
-    demo.isDemoMode = 0;   //disable DemoMode add first CAN-Data recive.
+  CanData.flagCanRecv = 1;
+    if(demo.isDemoMode == 1){ //disable DemoMode add first CAN-Data recive and reset all demo values
+      demo.isDemoMode = 0;
+      resetDemoValue();
+    }     
 }
 
 void initCAN(void){
@@ -190,49 +239,65 @@ Adafruit_NeoPixel neoPixels(NEOPIXEL_NUMBER_OF_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO
 uint32_t lastNeoFlash;
 bool speedBarFlush = 0;
 
-void initNeopixel(void){
-    neoPixels.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-    neoPixels.show();            // Turn OFF all pixels ASAP
-    neoPixels.setBrightness(NEOPIXEL_BRIGHTNESS); // Set BRIGHTNESS to about 1/5 (max = 255)
-    lastNeoFlash = millis();
-}
-
 const uint32_t red = neoPixels.Color(255, 0, 0); // Red
 const uint32_t green = neoPixels.Color( 0, 255, 0); // Green
 const uint32_t yellow = neoPixels.Color( 255, 255, 0); // Yellow
 const uint32_t blue = neoPixels.Color( 0, 0, 255); // Blue
+const uint32_t orange = neoPixels.Color( 255, 50, 0); // UMD orange
 
-void updateSpeedBar(int percent) {
-  uint8_t numNeoPixels = NEOPIXEL_NUMBER_OF_LEDS;
-  int speedLeds = numNeoPixels * percent / 100;
-
-  if(speedLeds < numNeoPixels*0.69 || speedLeds > numNeoPixels*0.85) {
-    speedBarFlush = 0;
-    
-  } else {
-    if(speedBarFlush == 1) {
-      speedBarFlush = 0;
-      neoPixels.clear();
-      neoPixels.show();
-      lastNeoFlash = millis();
-      return;
-    }
-    speedBarFlush = 1;
-  }
-  
-  neoPixels.clear();
-  for(int a=0; a < speedLeds; a++) {
-    if(a < numNeoPixels*0.23)
-      neoPixels.setPixelColor(numNeoPixels-a, blue);
-    else if (a < numNeoPixels*0.69) 
-      neoPixels.setPixelColor(numNeoPixels-a, green); // Set pixel 'c' to value 'color'
-    else if (a < numNeoPixels*0.85) 
-      neoPixels.setPixelColor(numNeoPixels-a, yellow); // Set pixel 'c' to value 'color'
-    else
-      neoPixels.setPixelColor(numNeoPixels-a, red); // Set pixel 'c' to value 'color'
-  }
-  neoPixels.show();
+void initNeopixel(void){
+  neoPixels.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  neoPixels.setBrightness(NEOPIXEL_BRIGHTNESS); // Set BRIGHTNESS
+  neoPixels.fill(orange);
+  neoPixels.show(); 
   lastNeoFlash = millis();
+}
+
+const uint32_t* progressColor[] = {&yellow, &red};
+void updateProgress(uint8_t _state, uint8_t colorValue){
+    const uint8_t progress = (uint8_t)(NEOPIXEL_NUMBER_OF_LEDS / DISPLAY_NUMBER_OF_STATES);
+    const uint8_t halfOfRest = (NEOPIXEL_NUMBER_OF_LEDS % DISPLAY_NUMBER_OF_STATES)/2;
+    neoPixels.clear();
+    for(uint8_t i=(stateCount*progress)+halfOfRest;i<((stateCount*progress)+progress+halfOfRest);i++){
+      neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-i-1, *(progressColor[colorValue]));
+    }
+    //delay(400);
+    neoPixels.show();
+}
+
+
+void updateSpeedBar() {
+  if(displayMode > 0){
+    int speedLeds = NEOPIXEL_NUMBER_OF_LEDS * (rpm/(UMD_MAX_ENGINE_SPEED/100)) / 100;
+
+    if(speedLeds < NEOPIXEL_NUMBER_OF_LEDS*0.69 || speedLeds > NEOPIXEL_NUMBER_OF_LEDS*0.85) {
+      speedBarFlush = 0;
+      
+    } else {
+      if(speedBarFlush == 1) {
+        speedBarFlush = 0;
+        neoPixels.clear();
+        neoPixels.show();
+        lastNeoFlash = millis();
+        return;
+      }
+      speedBarFlush = 1;
+    }
+    
+    neoPixels.clear();
+    for(int a=0; a < speedLeds; a++) {
+      if(a < NEOPIXEL_NUMBER_OF_LEDS*0.23)
+        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, blue);
+      else if (a < NEOPIXEL_NUMBER_OF_LEDS*0.69) 
+        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, green); // Set pixel 'c' to value 'color'
+      else if (a < NEOPIXEL_NUMBER_OF_LEDS*0.85) 
+        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, yellow); // Set pixel 'c' to value 'color'
+      else
+        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, red); // Set pixel 'c' to value 'color'
+    }
+    neoPixels.show();
+    lastNeoFlash = millis();
+  }
 }
 
 #endif
