@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name PESD1CAN)(type Legacy)(uri ${KIPRJMOD}/PESD1CAN.mod)(options "")(descr ""))
+  (lib (name PCB_KiCad_Files)(type KiCad)(uri ${KIPRJMOD}/)(options "")(descr ""))
+)

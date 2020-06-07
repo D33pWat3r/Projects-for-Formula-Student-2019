@@ -1,0 +1,7 @@
+(sym_lib_table
+  (lib (name circuit-rescue)(type Legacy)(uri ${KIPRJMOD}/circuit-rescue.lib)(options "")(descr ""))
+  (lib (name ESP8266)(type Legacy)(uri ${KIPRJMOD}/ESP8266.lib)(options "")(descr ""))
+  (lib (name PESD1CAN)(type Legacy)(uri ${KIPRJMOD}/PESD1CAN.lib)(options "")(descr ""))
+  (lib (name tinkerforge)(type Legacy)(uri ${KIPRJMOD}/tinkerforge.lib)(options "")(descr ""))
+  (lib (name MAX7219)(type Legacy)(uri ${KIPRJMOD}/MAX7219.lib)(options "")(descr ""))
+)
