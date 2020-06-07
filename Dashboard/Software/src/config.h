@@ -20,12 +20,7 @@
 
 //Input Configuration
 #define BUTTON_PIN 3 //is an Interrupt Pin too
-#define BUTTON_BOUNCE_TIME 200 //a Button bounce between HIGH and LOW for a specific time; this is the max. bounce time in milliseconds
-
-//Output Configuration
-#define LED_PIN_1 5
-#define LED_PIN_2 6
-#define LED_PIN_3 9
+#define BUTTON_BOUNCE_TIME 40 //a Button bounce between HIGH and LOW for a specific time; this is the max. bounce time in milliseconds
 
 /**
  * Display & LED Configuration
@@ -36,7 +31,7 @@
 #define DISPLAY_DELAY_BY_SCREEN_CHANGE 1000 //time in milliseconds for show the current Display Screen Number
 
 #define NEOPIXEL_REFRESH_RATE 20 //in milliseconds
-#define NEOPIXEL_BRIGHTNESS 20 //0 - 255
+#define NEOPIXEL_BRIGHTNESS 50 //0 - 255
 
 /**
  * Demo Configuration

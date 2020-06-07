@@ -8,15 +8,13 @@ void setup() {
   initDebugging(115200); //Starte Seriellen Port für debugging Ausgaben
   initDisplay(); //Start Display
   initNeopixel(); //Start NeoPixel
-  //initCAN(); // Start CAN-BUS
+  initCAN(); // Start CAN-BUS
   initInput(); //Set Button to Input
-  delay(20000);
-  display.setSegments(display_blank, 4, 0);
 }
 
 void loop() {
   //Read CAN if new incoming Datas
-  if(CanData.flagCanRecv && !demo.isDemoMode_Button) readCAN(); 
+  if(CanData.flagCanRecv) readCAN(); 
   
   //Refreshing Display
   if(millis() - lastDisplayFlash > DISPLAY_REFRESH_RATE) {
