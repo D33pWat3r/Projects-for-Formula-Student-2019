@@ -6,8 +6,6 @@
 #include <Arduino.h> //Arduino Framework
 #include <SPI.h>  //Arduino SPI Library
 
-#define UMD_MAX_ENGINE_SPEED 13000
-
 uint16_t rpm = 0;     //Engine RPM
 uint16_t seconds = 0; //Seconds ECU has been on
 float clt; //Coolant temperature CAN in degF saved in degC
@@ -84,7 +82,7 @@ void demoCalcSpeed() {
     }
   }
 
-  rpm = UMD_MAX_ENGINE_SPEED / 100 * demo.demoIs ;
+  rpm = NEOPIXEL_RPM_MAX / 100 * demo.demoIs ;
   demo.lastDemoCalc = millis();
 }
 
@@ -121,7 +119,7 @@ const uint8_t display_umd[] =  { 0b00111110, 0b00110011, 0b00100111, 0b00111111 
 const uint8_t display_fs19[] = { 0b01110001, 0b01101101, 0b00000110, 0b01101111 }; //FS19
 
 const uint8_t screen[][4] ={
-  { 0b01101101, 0b01111000, 0b01011100, 0b01111000 }, // Stat; must be on the first position!
+  { 0b01101101, 0b01111000, 0b01110111, 0b01111000 }, // StAt; must be on the first position!
   { 0b10000110, 0b01111001, 0b01010100, 0b01011110 }, // 1.End
   { 0b11011011, 0b01110111, 0b01011000, 0b01011000 }, // 2.Acc 
 //{ 0b11001111, 0b01111111, 0b01111111, 0b01111111 }, // 3.888     
@@ -129,10 +127,10 @@ const uint8_t screen[][4] ={
 };
 
 const uint8_t state[][4] ={
-  { 0b01111100, 0b01011100, 0b01111000, 0b01111000 }, //batt -> Batterie Voltage
-  { 0b00111101, 0b01111001, 0b01011100, 0b01010000 }, //GEar -> current Gear
-  //{ 0b00111001, 0b00110000, 0b01111000, 0b00000000 }, //Clt -> Engine Temperature
-  { 0b01111000, 0b01111001, 0b01010101, 0b01110011 }, //tEMP -> Engine Temperature      
+  { 0b01111100, 0b01110111, 0b01111000, 0b11111000 }, //bAtt. -> Batterie Voltage
+  { 0b00111101, 0b01111001, 0b01110111, 0b11010000 }, //GEAr. -> current Gear
+  { 0b00111001, 0b00111000, 0b01111000, 0b10000000 }, //CLt_. -> Engine Temperature
+  //{ 0b01111000, 0b01111001, 0b01010101, 0b11110011 }, //tEMP. -> Engine Temperature      
 };
 
 void initDisplay(void){
@@ -188,7 +186,7 @@ void refreshDisplay(){
       case(2): //Gear and RPM -> acceleration
         //display.setSegments(displayBlank, 1, 1);        
         display.showNumberDecEx(gear, 0x80, false, 1, 0); //x.yyy -> x= Gear; y=RPM
-        display.showNumberDec((int) (rpm/100), false, 3, 1);
+        display.showNumberDec(rpm, false, 3, 1);
         break;
     }
   } else {
@@ -236,24 +234,46 @@ while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_16MHz))// init can bus : baudrate = 
 #include "Adafruit_NeoPixel.h" //WS2812b Library by Adafruit
 
 Adafruit_NeoPixel neoPixels(NEOPIXEL_NUMBER_OF_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
-uint32_t lastNeoFlash;
-bool speedBarFlush = 0;
 
-const uint32_t red = neoPixels.Color(255, 0, 0); // Red
-const uint32_t green = neoPixels.Color( 0, 255, 0); // Green
-const uint32_t yellow = neoPixels.Color( 255, 255, 0); // Yellow
-const uint32_t blue = neoPixels.Color( 0, 0, 255); // Blue
-const uint32_t orange = neoPixels.Color( 255, 50, 0); // UMD orange
+uint32_t lastNeoFlash;
+
+enum BrighnessLevel {normal, high, low};
+uint32_t getColor(uint8_t r, uint8_t g, uint8_t b, BrighnessLevel levelOfBrightness = normal){
+  float temp0;
+  if (levelOfBrightness = normal) temp0 = (NEOPIXEL_BRIGHTNESS/255.0);
+  if (levelOfBrightness = high) temp0 = (NEOPIXEL_SHIFTLIGHT_BRIGHTNESS/255.0);
+  if (levelOfBrightness = low) temp0 = (NEOPIXEL_RPM_LOW_BRIGHTNESS/255.0);
+  uint8_t temp1 = (r * temp0);
+  uint8_t temp2 = (g * temp0);
+  uint8_t temp3 = (b * temp0);
+  return ((uint32_t)temp1 << 16) | ((uint32_t)temp2 <<  8) | (uint32_t)temp3;
+}    
+
+const uint32_t normalWhite = getColor(255,255,255); // white
+
+const uint32_t normalRed = getColor(255, 0, 0); // Red
+const uint32_t normalGreen = getColor(0, 255, 0); // Green
+const uint32_t normalYellow = getColor(255, 255, 0); // Yellow
+const uint32_t normalBlue = getColor( 0, 0, 255); // Blue
+const uint32_t normalOrange = getColor( 255, 80, 0); // orange
+
+const uint32_t lowRed = getColor(255, 0, 0,low); // Red
+const uint32_t lowGreen = getColor(0, 255, 0,low); // Green
+const uint32_t lowYellow = getColor(255, 255, 0,low); // Yellow
+const uint32_t lowBlue = getColor( 0, 0, 255,low); // Blue
+
+const uint32_t shiftLightWhite = getColor(25, 255, 255,high); // white
+const uint32_t shiftLightRed = getColor(255, 0, 0,high); // Red
 
 void initNeopixel(void){
   neoPixels.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  neoPixels.setBrightness(NEOPIXEL_BRIGHTNESS); // Set BRIGHTNESS
-  neoPixels.fill(orange);
+  neoPixels.setBrightness(255); // Set BRIGHTNESS
+  neoPixels.fill(normalOrange);
   neoPixels.show(); 
   lastNeoFlash = millis();
 }
 
-const uint32_t* progressColor[] = {&yellow, &red};
+const uint32_t* progressColor[] = {&normalYellow, &normalRed};
 void updateProgress(uint8_t _state, uint8_t colorValue){
     const uint8_t progress = (uint8_t)(NEOPIXEL_NUMBER_OF_LEDS / DISPLAY_NUMBER_OF_STATES);
     const uint8_t halfOfRest = (NEOPIXEL_NUMBER_OF_LEDS % DISPLAY_NUMBER_OF_STATES)/2;
@@ -261,39 +281,54 @@ void updateProgress(uint8_t _state, uint8_t colorValue){
     for(uint8_t i=(stateCount*progress)+halfOfRest;i<((stateCount*progress)+progress+halfOfRest);i++){
       neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-i-1, *(progressColor[colorValue]));
     }
-    //delay(400);
     neoPixels.show();
 }
 
-
-void updateSpeedBar() {
+bool speedBarFlush = 0;
+bool fromLeft = true;
+void updateSpeedBar() {  
   if(displayMode > 0){
-    int speedLeds = NEOPIXEL_NUMBER_OF_LEDS * (rpm/(UMD_MAX_ENGINE_SPEED/100)) / 100;
-
-    if(speedLeds < NEOPIXEL_NUMBER_OF_LEDS*0.69 || speedLeds > NEOPIXEL_NUMBER_OF_LEDS*0.85) {
-      speedBarFlush = 0;
-      
-    } else {
-      if(speedBarFlush == 1) {
-        speedBarFlush = 0;
-        neoPixels.clear();
-        neoPixels.show();
-        lastNeoFlash = millis();
-        return;
-      }
-      speedBarFlush = 1;
+    uint8_t speedLeds;
+    uint32_t rpmColor;
+    uint32_t last_rpmColor;
+    if(rpm<=NEOPIXEL_RPM_LOW){
+      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ NEOPIXEL_RPM_LOW);
+      rpmColor = normalBlue;
+      #if NEOPIXEL_RPM_LOLD_COLOR
+        fromLeft = true; 
+      #endif
     }
-    
+    if((rpm>NEOPIXEL_RPM_LOW) && (rpm<=NEOPIXEL_RPM_MIDDLE)){
+      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_MIDDLE));
+      rpmColor = normalGreen;
+      #if NEOPIXEL_RPM_LOLD_COLOR
+        fromLeft = false; 
+      #endif
+    }
+    if((rpm>NEOPIXEL_RPM_MIDDLE) && (rpm<=NEOPIXEL_RPM_HIGH)){
+      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_HIGH));
+      rpmColor = normalYellow;
+      #if NEOPIXEL_RPM_LOLD_COLOR
+        fromLeft = true; 
+      #endif
+    }    
+    if((rpm>NEOPIXEL_RPM_HIGH) && (rpm<=NEOPIXEL_RPM_MAX)){
+      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_MAX));
+      rpmColor = normalRed;
+      #if NEOPIXEL_RPM_LOLD_COLOR
+        fromLeft = false; 
+      #endif
+    }      
+
     neoPixels.clear();
+
+    for(int a=0; a < NEOPIXEL_RPM_MIN_LED; a++) {
+        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, rpmColor);
+          else neoPixels.setPixelColor(a, rpmColor);
+    }
     for(int a=0; a < speedLeds; a++) {
-      if(a < NEOPIXEL_NUMBER_OF_LEDS*0.23)
-        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, blue);
-      else if (a < NEOPIXEL_NUMBER_OF_LEDS*0.69) 
-        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, green); // Set pixel 'c' to value 'color'
-      else if (a < NEOPIXEL_NUMBER_OF_LEDS*0.85) 
-        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, yellow); // Set pixel 'c' to value 'color'
-      else
-        neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, red); // Set pixel 'c' to value 'color'
+        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a+NEOPIXEL_RPM_MIN_LED, rpmColor);
+          else neoPixels.setPixelColor(a+NEOPIXEL_RPM_MIN_LED, rpmColor);
     }
     neoPixels.show();
     lastNeoFlash = millis();
