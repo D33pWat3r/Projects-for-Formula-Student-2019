@@ -11,7 +11,7 @@
 #define CAN_ID_THROTTLE 1003
 #define CAN_ID_GEAR 1033
 #define CAN_ID_FUEL_DATA 1052
-#define CAN_ID_CANOUT 0000
+#define CAN_ID_CANOUT 1052
 
 struct tCAN_Data{
     bool flagCanRecv = false;

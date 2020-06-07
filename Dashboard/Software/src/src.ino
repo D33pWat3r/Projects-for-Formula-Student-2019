@@ -8,7 +8,9 @@ void setup() {
   initDebugging(115200); //Starte Seriellen Port für debugging Ausgaben
   initDisplay(); //Start Display
   initNeopixel(); //Start NeoPixel
-  //initCAN(); // Start CAN-BUS
+  #if CAN_ACTIVATE==1
+    initCAN(); // Start CAN-BUS 
+  #endif
   initInput(); //Set Button to Input
   delay(2000);
   display.setSegments(display_blank, 4, 0);
@@ -18,6 +20,14 @@ void loop() {
   //Read CAN if new incoming Datas
   if(CanData.flagCanRecv && !demo.isDemoMode_Button) readCAN(); 
   
+  //Check for ShiftLight
+
+  #if NEOPIXEL_SHIFTLIGHT_CAN == 0
+    if(checkRpmForShiftLight) makeShiftLight();
+  #else
+    if(shift) makeShiftLight();
+  #endif
+
   //Refreshing Display
   if(millis() - lastDisplayFlash > DISPLAY_REFRESH_RATE) {
     lastDisplayFlash = millis();
@@ -33,6 +43,8 @@ void loop() {
   if((millis() - demo.lastDemoCalc > DEMO_CALC_SPEED) && (demo.isDemoMode || demo.isDemoMode_Button) ) {
     demoCalcSpeed();
   }
+
+
 }
 
 

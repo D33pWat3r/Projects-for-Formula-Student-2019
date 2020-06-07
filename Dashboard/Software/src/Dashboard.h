@@ -7,6 +7,7 @@
 #include <SPI.h>  //Arduino SPI Library
 
 uint16_t rpm = 0;     //Engine RPM
+uint16_t rpm_old = 0;
 uint16_t seconds = 0; //Seconds ECU has been on
 float clt; //Coolant temperature CAN in degF saved in degC
 float mat; //Manifold air temperature CAN in degF saved in degC
@@ -21,6 +22,9 @@ bool shift; //Shift light indicator;
 
 // Declerations ******************************************************************************************
 void updateProgress(uint8_t _state, uint8_t colorValue);
+uint8_t speedLeds;
+bool shiftLightIsActive = false;
+uint32_t shiftLightActiveTime = 0;
 
 // Debugging ******************************************************************************************
 void initDebugging(uint32_t baud){
@@ -58,36 +62,40 @@ void resetDemoValue(){
 }
 
 void demoCalcSpeed() {
-  if(demo.demoUp) {
-    demo.demoIs++;
-    
-    if(demo.demoIs == demo.demoTarget) {
-      demo.demoTarget = random(0, demo.demoIs - 5);
-      demo.demoUp = 0;                   //fallende Drehzahl
-      clt = random(60, 100);
-    }
+  if(DEMO_RPM_BY_POTENTIOMETER){
+    rpm=map(analogRead(RPM_POTI),0,1024,DEMO_RPM_POTENTIOMETER_MIN,DEMO_RPM_POTENTIOMETER_MAX);
+  }else{
+    if(demo.demoUp) {
+      demo.demoIs++;
+      
+      if(demo.demoIs == demo.demoTarget) {
+        demo.demoTarget = random(0, demo.demoIs - 5);
+        demo.demoUp = 0;                   //fallende Drehzahl
+        clt = random(60, 100);
+      }
 
-  } else {  
-    demo.demoIs--;
-    
-    if(demo.demoIs == demo.demoTarget) {
-      demo.demoTarget = random(demo.demoIs + 5, 100);
-      demo.demoUp = 1;                   //steigende Drehzahl
-      gear = random(gear-1, gear+2);
-      if(gear < 0)
-        gear = 0;
-        
-      if(gear > 6)
-        gear = 6;
+    } else {  
+      demo.demoIs--;
+      
+      if(demo.demoIs == demo.demoTarget) {
+        demo.demoTarget = random(demo.demoIs + 5, 100);
+        demo.demoUp = 1;                   //steigende Drehzahl
+        gear = random(gear-1, gear+2);
+        if(gear < 0)
+          gear = 0;
+          
+        if(gear > 6)
+          gear = 6;
+      }
     }
+    rpm = NEOPIXEL_RPM_MAX / 100 * demo.demoIs ;
   }
-
-  rpm = NEOPIXEL_RPM_MAX / 100 * demo.demoIs ;
   demo.lastDemoCalc = millis();
 }
 
+
 // Input Mode ******************************************************************************************
-volatile uint8_t displayMode = 0;
+volatile uint8_t displayMode = DISPLAY_START_SCREEN;
 volatile bool pushButtonIsSet = true;
 
 void ISR_Button(){
@@ -95,9 +103,13 @@ void ISR_Button(){
   uint32_t currentPushTime = millis();
   
   if(currentPushTime - lastPushTime >= BUTTON_BOUNCE_TIME){
-    pushButtonIsSet = true;
-    displayMode = (displayMode +1) % (DISPLAY_NUMBER_OF_SCREENS+1);
-    demo.isDemoMode_Button = false;
+    #if NEOPIXEL_SHIFTLIGHT_BUTTON_TEST == 1
+      shift = true;
+    #else
+      pushButtonIsSet = true;
+      displayMode = (displayMode +1) % (DISPLAY_NUMBER_OF_SCREENS);    
+      demo.isDemoMode_Button = false;
+    #endif
   }
   lastPushTime = currentPushTime;
 }
@@ -123,14 +135,15 @@ const uint8_t screen[][4] ={
   { 0b10000110, 0b01111001, 0b01010100, 0b01011110 }, // 1.End
   { 0b11011011, 0b01110111, 0b01011000, 0b01011000 }, // 2.Acc 
 //{ 0b11001111, 0b01111111, 0b01111111, 0b01111111 }, // 3.888     
-  { 0b01011110, 0b01111001, 0b01010101, 0b00111111 }  // dEMO; must be the last entry in this array!       
+  { 0b01011110, 0b01111001, 0b01010101, 0b00111111 },  // dEMO; must be the last entry in this array!       
+  { 0b01011110, 0b01111100, 0b00011100, 0b10111101 }, //dbuG -> for debugging 
 };
 
 const uint8_t state[][4] ={
   { 0b01111100, 0b01110111, 0b01111000, 0b11111000 }, //bAtt. -> Batterie Voltage
   { 0b00111101, 0b01111001, 0b01110111, 0b11010000 }, //GEAr. -> current Gear
   { 0b00111001, 0b00111000, 0b01111000, 0b10000000 }, //CLt_. -> Engine Temperature
-  //{ 0b01111000, 0b01111001, 0b01010101, 0b11110011 }, //tEMP. -> Engine Temperature      
+  //{ 0b01111000, 0b01111001, 0b01010101, 0b11110011 }, //tEMP. -> Engine Temperature    
 };
 
 void initDisplay(void){
@@ -170,7 +183,7 @@ void refreshDisplay(){
           }          
           break;
         }
-        if(lastTimeCount == DISPLAY_DELAY_MULTIPLIER){
+        if(lastTimeCount == DISPLAY_STATE_DELAY_MULTIPLIER){
           lastTimeCount = 0;
           if(!showState) {stateCount=(stateCount+1)%DISPLAY_NUMBER_OF_STATES;}
           showState=!showState;
@@ -179,14 +192,20 @@ void refreshDisplay(){
         
         break;    
       case(1): //Gear and Temperature -> endurance
-        //display.setSegments(displayBlank, 1, 1);
+        //display.setSegments(display_blank, 1, 1);
         display.showNumberDecEx(gear, 0x80, false, 1, 0); //x.yyy -> x= Gear; y=Temperature
         display.showNumberDec(clt, false, 3, 1);        
         break;
+
       case(2): //Gear and RPM -> acceleration
-        //display.setSegments(displayBlank, 1, 1);        
+        //display.setSegments(display_blank, 1, 1);        
         display.showNumberDecEx(gear, 0x80, false, 1, 0); //x.yyy -> x= Gear; y=RPM
         display.showNumberDec(rpm, false, 3, 1);
+        break;
+
+      case(DISPLAY_NUMBER_OF_SCREENS+1): //Debugging
+        //display.showNumberDecEx(shiftLightIsActive, 0b10000000, false, 1, 0);
+        display.showNumberDec((shiftLightActiveTime/10), true, 4, 0);        
         break;
     }
   } else {
@@ -240,9 +259,9 @@ uint32_t lastNeoFlash;
 enum BrighnessLevel {normal, high, low};
 uint32_t getColor(uint8_t r, uint8_t g, uint8_t b, BrighnessLevel levelOfBrightness = normal){
   float temp0;
-  if (levelOfBrightness = normal) temp0 = (NEOPIXEL_BRIGHTNESS/255.0);
-  if (levelOfBrightness = high) temp0 = (NEOPIXEL_SHIFTLIGHT_BRIGHTNESS/255.0);
-  if (levelOfBrightness = low) temp0 = (NEOPIXEL_RPM_LOW_BRIGHTNESS/255.0);
+  if (levelOfBrightness == normal) temp0 = (NEOPIXEL_BRIGHTNESS/255.0);
+  if (levelOfBrightness == high) temp0 = (NEOPIXEL_SHIFTLIGHT_BRIGHTNESS/255.0);
+  if (levelOfBrightness == low) temp0 = (NEOPIXEL_RPM_LOW_BRIGHTNESS/255.0);
   uint8_t temp1 = (r * temp0);
   uint8_t temp2 = (g * temp0);
   uint8_t temp3 = (b * temp0);
@@ -262,7 +281,7 @@ const uint32_t lowGreen = getColor(0, 255, 0,low); // Green
 const uint32_t lowYellow = getColor(255, 255, 0,low); // Yellow
 const uint32_t lowBlue = getColor( 0, 0, 255,low); // Blue
 
-const uint32_t shiftLightWhite = getColor(25, 255, 255,high); // white
+const uint32_t shiftLightWhite = getColor(255, 255, 255,high); // white
 const uint32_t shiftLightRed = getColor(255, 0, 0,high); // Red
 
 void initNeopixel(void){
@@ -272,7 +291,7 @@ void initNeopixel(void){
   neoPixels.show(); 
   lastNeoFlash = millis();
 }
-
+// Neopixel - State ProgressBar ******************************************************************************************
 const uint32_t* progressColor[] = {&normalYellow, &normalRed};
 void updateProgress(uint8_t _state, uint8_t colorValue){
     const uint8_t progress = (uint8_t)(NEOPIXEL_NUMBER_OF_LEDS / DISPLAY_NUMBER_OF_STATES);
@@ -284,55 +303,74 @@ void updateProgress(uint8_t _state, uint8_t colorValue){
     neoPixels.show();
 }
 
-bool speedBarFlush = 0;
-bool fromLeft = true;
-void updateSpeedBar() {  
-  if(displayMode > 0){
-    uint8_t speedLeds;
+// Neopixel - RPM Band ******************************************************************************************
+uint8_t fromLeft = NEOPIXEL_RPM_DIRECTION;
+void updateSpeedBar() {
+  if((millis() - shiftLightActiveTime) > NEOPIXEL_SHIFTLIGHT_DELAY) shiftLightIsActive = false;
+  if((displayMode > 0) && (!shiftLightIsActive)){
+    
     uint32_t rpmColor;
-    uint32_t last_rpmColor;
     if(rpm<=NEOPIXEL_RPM_LOW){
-      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ NEOPIXEL_RPM_LOW);
+      speedLeds = map(rpm,0,NEOPIXEL_RPM_LOW,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);      
       rpmColor = normalBlue;
-      #if NEOPIXEL_RPM_LOLD_COLOR
+      #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = true; 
       #endif
     }
     if((rpm>NEOPIXEL_RPM_LOW) && (rpm<=NEOPIXEL_RPM_MIDDLE)){
-      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_MIDDLE));
+      speedLeds = map(rpm,NEOPIXEL_RPM_LOW,NEOPIXEL_RPM_MIDDLE,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
       rpmColor = normalGreen;
-      #if NEOPIXEL_RPM_LOLD_COLOR
+      #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = false; 
       #endif
     }
     if((rpm>NEOPIXEL_RPM_MIDDLE) && (rpm<=NEOPIXEL_RPM_HIGH)){
-      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_HIGH));
+      speedLeds = map(rpm,NEOPIXEL_RPM_MIDDLE,NEOPIXEL_RPM_HIGH,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
       rpmColor = normalYellow;
-      #if NEOPIXEL_RPM_LOLD_COLOR
+      #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = true; 
       #endif
     }    
     if((rpm>NEOPIXEL_RPM_HIGH) && (rpm<=NEOPIXEL_RPM_MAX)){
-      speedLeds = (uint8_t) ((NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED) * (double)rpm/ (NEOPIXEL_RPM_MAX));
+      speedLeds = map(rpm,NEOPIXEL_RPM_HIGH,NEOPIXEL_RPM_MAX,0,NEOPIXEL_NUMBER_OF_LEDS-NEOPIXEL_RPM_MIN_LED);
       rpmColor = normalRed;
-      #if NEOPIXEL_RPM_LOLD_COLOR
+      #if NEOPIXEL_RPM_DIRECTION == 2
         fromLeft = false; 
       #endif
     }      
 
     neoPixels.clear();
 
-    for(int a=0; a < NEOPIXEL_RPM_MIN_LED; a++) {
+    for(uint8_t a=0; a < NEOPIXEL_RPM_MIN_LED; a++) {
         if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a, rpmColor);
           else neoPixels.setPixelColor(a, rpmColor);
     }
-    for(int a=0; a < speedLeds; a++) {
-        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a+NEOPIXEL_RPM_MIN_LED, rpmColor);
+    for(uint8_t a=0; a < speedLeds; a++) {
+        if(fromLeft) neoPixels.setPixelColor(NEOPIXEL_NUMBER_OF_LEDS-1-a-NEOPIXEL_RPM_MIN_LED, rpmColor);
           else neoPixels.setPixelColor(a+NEOPIXEL_RPM_MIN_LED, rpmColor);
     }
     neoPixels.show();
     lastNeoFlash = millis();
   }
+
+}
+
+// Neopixel - ShiftLight ******************************************************************************************
+bool checkRpmForShiftLight(void){
+  if(rpm != rpm_old){
+    shift = false;
+  }
+  return false;
+}
+
+void makeShiftLight(void){
+  if(!shiftLightIsActive){
+    shiftLightIsActive =true;
+    neoPixels.fill(shiftLightRed);
+    neoPixels.show();
+    shiftLightActiveTime = millis();
+    shift = false;
+  }  
 }
 
 #endif
